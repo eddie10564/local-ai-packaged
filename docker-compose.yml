@@ -4,9 +4,7 @@ include:
 volumes:
   n8n_storage:
   ollama_storage:
-  qdrant_storage:
   open-webui:
-  flowise:
   caddy-data:
   caddy-config:
   valkey-data:
@@ -54,22 +52,6 @@ x-init-ollama: &init-ollama
     - "sleep 3; OLLAMA_HOST=ollama:11434 ollama pull qwen2.5:7b-instruct-q4_K_M; OLLAMA_HOST=ollama:11434 ollama pull nomic-embed-text"
 
 services:
-  flowise:
-    image: flowiseai/flowise
-    restart: unless-stopped
-    container_name: flowise
-    expose:
-      - 3001/tcp
-    environment:
-        - PORT=3001
-        - FLOWISE_USERNAME=${FLOWISE_USERNAME}
-        - FLOWISE_PASSWORD=${FLOWISE_PASSWORD}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-        - ~/.flowise:/root/.flowise
-    entrypoint: /bin/sh -c "sleep 3; flowise start"
-
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     restart: unless-stopped
@@ -104,16 +86,6 @@ services:
     depends_on:
       n8n-import:
         condition: service_completed_successfully
-
-  qdrant:
-    image: qdrant/qdrant
-    container_name: qdrant
-    restart: unless-stopped
-    expose:
-      - 6333/tcp
-      - 6334/tcp
-    volumes:
-      - qdrant_storage:/qdrant/storage
 
   neo4j:
     image: neo4j:latest
