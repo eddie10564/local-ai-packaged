@@ -5,6 +5,7 @@ volumes:
   n8n_storage:
   ollama_storage:
   open-webui:
+  flowise:
   caddy-data:
   caddy-config:
   valkey-data:
@@ -49,9 +50,25 @@ x-init-ollama: &init-ollama
   entrypoint: /bin/sh
   command:
     - "-c"
-    - "sleep 3; OLLAMA_HOST=ollama:11434 ollama pull qwen2.5:7b-instruct-q4_K_M; OLLAMA_HOST=ollama:11434 ollama pull nomic-embed-text; ollama run gpt-oss:20b"
+    - "sleep 3; OLLAMA_HOST=ollama:11434 ollama pull qwen2.5:7b-instruct-q4_K_M; OLLAMA_HOST=ollama:11434 ollama pull nomic-embed-text"
 
 services:
+  flowise:
+    image: flowiseai/flowise
+    restart: unless-stopped
+    container_name: flowise
+    expose:
+      - 3001/tcp
+    environment:
+        - PORT=3001
+        - FLOWISE_USERNAME=${FLOWISE_USERNAME}
+        - FLOWISE_PASSWORD=${FLOWISE_PASSWORD}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+        - ~/.flowise:/root/.flowise
+    entrypoint: /bin/sh -c "sleep 3; flowise start"
+
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     restart: unless-stopped
@@ -329,10 +346,42 @@ services:
 
   ollama-cpu:
     profiles: ["cpu"]
-
     <<: *service-ollama
+
+  ollama-gpu:
+    profiles: ["gpu-nvidia"]
+    <<: *service-ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  ollama-gpu-amd:
+    profiles: ["gpu-amd"]
+    <<: *service-ollama
+    image: ollama/ollama:rocm
+    devices:
+      - "/dev/kfd"
+      - "/dev/dri"
+
   ollama-pull-llama-cpu:
     profiles: ["cpu"]
     <<: *init-ollama
     depends_on:
       - ollama-cpu
+
+  ollama-pull-llama-gpu:
+    profiles: ["gpu-nvidia"]
+    <<: *init-ollama
+    depends_on:
+      - ollama-gpu
+
+  ollama-pull-llama-gpu-amd:
+    profiles: [gpu-amd]
+    <<: *init-ollama
+    image: ollama/ollama:rocm
+    depends_on:
+     - ollama-gpu-amd
